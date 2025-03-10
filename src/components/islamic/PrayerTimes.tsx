@@ -11,7 +11,8 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
-import { Bell, MapPin, RefreshCw, Settings } from "lucide-react";
+import { Bell, MapPin, RefreshCw, Settings, Loader2 } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface PrayerTime {
   name: string;
@@ -26,26 +27,34 @@ interface PrayerTimesProps {
 }
 
 const PrayerTimes = ({
-  location = "New York, USA",
+  location = "",
   autoDetect = true,
-  prayerTimes = [
+  prayerTimes = [],
+}: PrayerTimesProps) => {
+  const [currentLocation, setCurrentLocation] = useState(location);
+  const [isAutoDetect, setIsAutoDetect] = useState(autoDetect);
+  const [prayers, setPrayers] = useState<PrayerTime[]>([
     { name: "Fajr", time: "05:23 AM", notificationEnabled: true },
     { name: "Sunrise", time: "06:45 AM", notificationEnabled: false },
     { name: "Dhuhr", time: "12:30 PM", notificationEnabled: true },
     { name: "Asr", time: "03:45 PM", notificationEnabled: true },
     { name: "Maghrib", time: "06:55 PM", notificationEnabled: true },
     { name: "Isha", time: "08:15 PM", notificationEnabled: true },
-  ],
-}: PrayerTimesProps) => {
-  const [currentLocation, setCurrentLocation] = useState(location);
-  const [isAutoDetect, setIsAutoDetect] = useState(autoDetect);
-  const [prayers, setPrayers] = useState<PrayerTime[]>(prayerTimes);
+  ]);
   const [isLoading, setIsLoading] = useState(false);
   const [locationInput, setLocationInput] = useState("");
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
+  const [calculationMethod, setCalculationMethod] = useState("2"); // ISNA method by default
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
   // Calculate next prayer
   const getNextPrayer = () => {
+    if (!prayers || prayers.length === 0) {
+      return "Loading...";
+    }
+
     const now = new Date();
     const currentTime = now.getHours() * 60 + now.getMinutes();
 
@@ -68,27 +77,155 @@ const PrayerTimes = ({
     return prayers[0].name; // Return first prayer of next day if all prayers passed
   };
 
-  const nextPrayer = getNextPrayer();
+  const nextPrayer = prayers.length > 0 ? getNextPrayer() : "Loading...";
 
-  // Simulate fetching prayer times
-  const fetchPrayerTimes = () => {
+  // Fetch prayer times from API
+  const fetchPrayerTimes = async () => {
     setIsLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
+    setError(null);
+
+    try {
+      if (!latitude || !longitude) {
+        throw new Error("Location coordinates are not available");
+      }
+
+      const today = new Date();
+      const day = today.getDate();
+      const month = today.getMonth() + 1;
+      const year = today.getFullYear();
+
+      // Using the AlAdhan API to get prayer times - daily endpoint
+      const url = `https://api.aladhan.com/v1/timings/${day}-${month}-${year}?latitude=${latitude}&longitude=${longitude}&method=${calculationMethod}`;
+
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data.code === 200 && data.data && data.data.timings) {
+        const timings = data.data.timings;
+
+        const formattedPrayers: PrayerTime[] = [
+          {
+            name: "Fajr",
+            time: formatTime(timings.Fajr),
+            notificationEnabled: true,
+          },
+          {
+            name: "Sunrise",
+            time: formatTime(timings.Sunrise),
+            notificationEnabled: false,
+          },
+          {
+            name: "Dhuhr",
+            time: formatTime(timings.Dhuhr),
+            notificationEnabled: true,
+          },
+          {
+            name: "Asr",
+            time: formatTime(timings.Asr),
+            notificationEnabled: true,
+          },
+          {
+            name: "Maghrib",
+            time: formatTime(timings.Maghrib),
+            notificationEnabled: true,
+          },
+          {
+            name: "Isha",
+            time: formatTime(timings.Isha),
+            notificationEnabled: true,
+          },
+        ];
+
+        setPrayers(formattedPrayers);
+
+        toast({
+          title: "Prayer times updated",
+          description: `Prayer times for ${currentLocation} have been updated.`,
+        });
+      } else {
+        throw new Error("Failed to fetch prayer times");
+      }
+    } catch (err) {
+      console.error("Error fetching prayer times:", err);
+      setError("Unable to fetch prayer times. Please try again later.");
+
+      // Set default prayer times as fallback
+      const defaultPrayers = [
+        { name: "Fajr", time: "05:23 AM", notificationEnabled: true },
+        { name: "Sunrise", time: "06:45 AM", notificationEnabled: false },
+        { name: "Dhuhr", time: "12:30 PM", notificationEnabled: true },
+        { name: "Asr", time: "03:45 PM", notificationEnabled: true },
+        { name: "Maghrib", time: "06:55 PM", notificationEnabled: true },
+        { name: "Isha", time: "08:15 PM", notificationEnabled: true },
+      ];
+
+      setPrayers(defaultPrayers);
+
       toast({
-        title: "Prayer times updated",
-        description: `Prayer times for ${currentLocation} have been updated.`,
+        variant: "destructive",
+        title: "Error",
+        description:
+          "Could not fetch prayer times. Using default times instead.",
       });
-    }, 1500);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Format time from API (remove timezone info)
+  const formatTime = (timeString: string): string => {
+    if (!timeString) return "";
+
+    // Remove timezone part (e.g., "15:30 (GMT+1)" -> "15:30")
+    const time = timeString.split(" ")[0];
+
+    // Convert 24h to 12h format
+    const [hours, minutes] = time.split(":");
+    const h = parseInt(hours, 10);
+    const period = h >= 12 ? "PM" : "AM";
+    const hour12 = h % 12 || 12;
+
+    return `${hour12}:${minutes} ${period}`;
   };
 
   // Handle location change
-  const handleLocationChange = () => {
+  const handleLocationChange = async () => {
     if (locationInput.trim()) {
-      setCurrentLocation(locationInput);
-      setLocationInput("");
-      fetchPrayerTimes();
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        // Use OpenStreetMap Nominatim API to geocode the location
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(locationInput)}`,
+        );
+
+        const data = await response.json();
+
+        if (data && data.length > 0) {
+          const { lat, lon, display_name } = data[0];
+          setLatitude(parseFloat(lat));
+          setLongitude(parseFloat(lon));
+          setCurrentLocation(display_name);
+          setLocationInput("");
+
+          // After setting coordinates, fetch prayer times
+          setTimeout(() => fetchPrayerTimes(), 100); // Small delay to ensure state is updated
+        } else {
+          throw new Error("Location not found");
+        }
+      } catch (err) {
+        console.error("Error geocoding location:", err);
+        setError("Could not find the specified location. Please try again.");
+        toast({
+          variant: "destructive",
+          title: "Location Error",
+          description:
+            "Could not find the specified location. Please try again.",
+        });
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -110,15 +247,81 @@ const PrayerTimes = ({
   // Auto-detect location effect
   useEffect(() => {
     if (isAutoDetect) {
-      // Simulate geolocation detection
       setIsLoading(true);
-      setTimeout(() => {
-        setCurrentLocation("Detected: New York, USA");
+      setError(null);
+
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            const { latitude, longitude } = position.coords;
+            setLatitude(latitude);
+            setLongitude(longitude);
+
+            try {
+              // Reverse geocode to get location name
+              const response = await fetch(
+                `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`,
+              );
+
+              const data = await response.json();
+
+              if (data && data.display_name) {
+                setCurrentLocation(data.display_name);
+              } else {
+                setCurrentLocation(
+                  `Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`,
+                );
+              }
+
+              // Fetch prayer times with the detected coordinates
+              fetchPrayerTimes();
+            } catch (err) {
+              console.error("Error reverse geocoding:", err);
+              setCurrentLocation(
+                `Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`,
+              );
+              fetchPrayerTimes();
+            }
+          },
+          (error) => {
+            console.error("Geolocation error:", error);
+            setError(
+              "Could not detect your location. Please enter it manually.",
+            );
+            setIsLoading(false);
+            setIsAutoDetect(false);
+
+            toast({
+              variant: "destructive",
+              title: "Location Error",
+              description:
+                "Could not detect your location. Please enter it manually.",
+            });
+          },
+        );
+      } else {
+        setError(
+          "Geolocation is not supported by your browser. Please enter location manually.",
+        );
         setIsLoading(false);
-        fetchPrayerTimes();
-      }, 1000);
+        setIsAutoDetect(false);
+
+        toast({
+          variant: "destructive",
+          title: "Location Error",
+          description:
+            "Geolocation is not supported by your browser. Please enter location manually.",
+        });
+      }
     }
   }, [isAutoDetect]);
+
+  // Update prayer times when calculation method changes
+  useEffect(() => {
+    if (latitude && longitude) {
+      fetchPrayerTimes();
+    }
+  }, [calculationMethod]);
 
   return (
     <Card className="w-full h-full bg-background">
@@ -176,20 +379,47 @@ const PrayerTimes = ({
             </div>
 
             <div className="flex items-center space-x-2">
-              <Select defaultValue="standard">
+              <Select
+                value={calculationMethod}
+                onValueChange={setCalculationMethod}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Calculation Method" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="standard">Standard (ISNA)</SelectItem>
-                  <SelectItem value="hanafi">Hanafi</SelectItem>
-                  <SelectItem value="shafi">Shafi</SelectItem>
-                  <SelectItem value="maliki">Maliki</SelectItem>
-                  <SelectItem value="hanbali">Hanbali</SelectItem>
+                  <SelectItem value="2">
+                    Islamic Society of North America (ISNA)
+                  </SelectItem>
+                  <SelectItem value="1">
+                    University of Islamic Sciences, Karachi
+                  </SelectItem>
+                  <SelectItem value="3">Muslim World League</SelectItem>
+                  <SelectItem value="4">
+                    Umm al-Qura University, Makkah
+                  </SelectItem>
+                  <SelectItem value="5">
+                    Egyptian General Authority of Survey
+                  </SelectItem>
+                  <SelectItem value="7">
+                    Institute of Geophysics, University of Tehran
+                  </SelectItem>
+                  <SelectItem value="12">
+                    Union des Organisations Islamiques de France
+                  </SelectItem>
+                  <SelectItem value="13">
+                    Diyanet İşleri Başkanlığı, Turkey
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
+
+          {/* Error message */}
+          {error && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
 
           {/* Prayer times list */}
           <div className="space-y-1 pt-2">
@@ -198,9 +428,13 @@ const PrayerTimes = ({
                 Next Prayer:{" "}
                 <span className="font-bold text-primary">{nextPrayer}</span>
               </h3>
-              <Button variant="ghost" size="icon">
-                <Settings className="h-4 w-4" />
-              </Button>
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Button variant="ghost" size="icon">
+                  <Settings className="h-4 w-4" />
+                </Button>
+              )}
             </div>
 
             <div className="space-y-2">

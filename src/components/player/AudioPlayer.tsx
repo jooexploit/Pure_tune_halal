@@ -90,7 +90,10 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
   useEffect(() => {
     // Create audio element if it doesn't exist
     if (!audioRef.current) {
-      audioRef.current = new Audio(currentTrack.audioUrl);
+      // Use a dummy audio file to prevent errors
+      const dummyAudioUrl =
+        "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
+      audioRef.current = new Audio(dummyAudioUrl);
       audioRef.current.volume = volume / 100;
 
       // Add event listeners
@@ -98,14 +101,17 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
       audioRef.current.addEventListener("ended", handleTrackEnd);
     }
 
-    // Update audio source if track changes
+    // Update audio source if track changes and URL is valid
     if (
       audioRef.current.src !== currentTrack.audioUrl &&
-      currentTrack.audioUrl
+      currentTrack.audioUrl &&
+      currentTrack.audioUrl.startsWith("http")
     ) {
       audioRef.current.src = currentTrack.audioUrl;
       if (isPlaying) {
-        audioRef.current.play();
+        audioRef.current
+          .play()
+          .catch((err) => console.log("Audio playback error:", err));
       }
     }
 
@@ -117,7 +123,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
         audioRef.current.pause();
       }
     };
-  }, [currentTrack]);
+  }, [currentTrack, isPlaying]);
 
   const handleTimeUpdate = () => {
     if (audioRef.current) {
@@ -195,17 +201,17 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 h-20 bg-background border-t border-border flex items-center px-4 z-50">
+    <div className="fixed bottom-0 left-0 right-0 h-auto md:h-20 bg-background border-t border-border flex flex-col md:flex-row items-center px-2 md:px-4 z-50 py-2 md:py-0">
       {/* Track Info */}
-      <div className="flex items-center space-x-3 w-1/4">
-        <div className="h-12 w-12 rounded-md overflow-hidden flex-shrink-0">
+      <div className="flex items-center space-x-3 w-full md:w-1/4 mb-2 md:mb-0">
+        <div className="h-10 w-10 md:h-12 md:w-12 rounded-md overflow-hidden flex-shrink-0">
           <img
             src={currentTrack.coverArt}
             alt={currentTrack.title}
             className="h-full w-full object-cover"
           />
         </div>
-        <div className="flex flex-col min-w-0">
+        <div className="flex flex-col min-w-0 flex-1">
           <h4 className="text-sm font-medium truncate">{currentTrack.title}</h4>
           <p className="text-xs text-muted-foreground truncate">
             {currentTrack.artist}
@@ -231,45 +237,25 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
       </div>
 
       {/* Player Controls */}
-      <div className="flex flex-col items-center justify-center flex-1 px-4 space-y-1">
+      <div className="flex flex-col items-center justify-center w-full md:flex-1 md:px-4 space-y-1">
         <div className="flex items-center space-x-2">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                  onClick={toggleShuffle}
-                >
-                  <Shuffle
-                    className={`h-4 w-4 ${isShuffle ? "text-primary" : ""}`}
-                  />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Shuffle</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-muted-foreground hover:text-foreground hidden md:flex"
+            onClick={toggleShuffle}
+          >
+            <Shuffle className={`h-4 w-4 ${isShuffle ? "text-primary" : ""}`} />
+          </Button>
 
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={onPrevious}
-                >
-                  <SkipBack className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Previous</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={onPrevious}
+          >
+            <SkipBack className="h-4 w-4" />
+          </Button>
 
           <Button
             variant="secondary"
@@ -284,47 +270,27 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
             )}
           </Button>
 
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={onNext}
-                >
-                  <SkipForward className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Next</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={onNext}
+          >
+            <SkipForward className="h-4 w-4" />
+          </Button>
 
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                  onClick={toggleRepeat}
-                >
-                  <Repeat
-                    className={`h-4 w-4 ${isRepeat ? "text-primary" : ""}`}
-                  />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Repeat</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-muted-foreground hover:text-foreground hidden md:flex"
+            onClick={toggleRepeat}
+          >
+            <Repeat className={`h-4 w-4 ${isRepeat ? "text-primary" : ""}`} />
+          </Button>
         </div>
 
         <div className="flex items-center w-full space-x-2">
-          <span className="text-xs text-muted-foreground w-10 text-right">
+          <span className="text-xs text-muted-foreground w-8 md:w-10 text-right">
             {formatTime(currentTime)}
           </span>
           <Slider
@@ -335,14 +301,14 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
             onValueChange={handleSeek}
             className="flex-1"
           />
-          <span className="text-xs text-muted-foreground w-10">
+          <span className="text-xs text-muted-foreground w-8 md:w-10">
             {formatTime(currentTrack.duration)}
           </span>
         </div>
       </div>
 
-      {/* Additional Controls */}
-      <div className="flex items-center space-x-2 w-1/4 justify-end">
+      {/* Additional Controls - Hidden on mobile, visible on desktop */}
+      <div className="hidden md:flex items-center space-x-2 w-1/4 justify-end">
         <div className="flex items-center space-x-2 mr-2">
           <Button
             variant="ghost"
@@ -441,6 +407,43 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
             <DropdownMenuItem>View Album</DropdownMenuItem>
             <DropdownMenuItem>Add to Queue</DropdownMenuItem>
             <DropdownMenuItem>Show Credits</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {/* Mobile-only volume control */}
+      <div className="flex md:hidden items-center w-full px-2 mt-1">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={toggleMute}
+        >
+          {isMuted ? (
+            <VolumeX className="h-4 w-4" />
+          ) : (
+            <Volume2 className="h-4 w-4" />
+          )}
+        </Button>
+        <Slider
+          value={[isMuted ? 0 : volume]}
+          min={0}
+          max={100}
+          step={1}
+          onValueChange={handleVolumeChange}
+          className="flex-1 mx-2"
+        />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={onDownload}>Download</DropdownMenuItem>
+            <DropdownMenuItem>Add to Playlist</DropdownMenuItem>
+            <DropdownMenuItem onClick={onShare}>Share</DropdownMenuItem>
+            <DropdownMenuItem>View Artist</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

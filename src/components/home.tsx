@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Outlet } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import Sidebar from "./layout/Sidebar";
 import Header from "./layout/Header";
 import MusicPlayerDashboard from "./dashboard/MusicPlayerDashboard";
@@ -16,6 +16,15 @@ interface HomeProps {
 const Home: React.FC<HomeProps> = ({ defaultTab = "music" }) => {
   const [activeTab, setActiveTab] = useState(defaultTab);
   const [isDarkMode, setIsDarkMode] = useState(true);
+  const location = useLocation();
+
+  // Update active tab based on route
+  useEffect(() => {
+    const path = location.pathname;
+    if (path === "/music") setActiveTab("music");
+    else if (path === "/social") setActiveTab("social");
+    else if (path === "/islamic") setActiveTab("islamic");
+  }, [location.pathname]);
 
   const handleTabChange = (value: string) => {
     setActiveTab(value);

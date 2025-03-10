@@ -88,7 +88,7 @@ const FeaturedContent: React.FC<FeaturedContentProps> = ({
     // Set the first featured track or the first track as featured
     const featured = tracks.find((track) => track.isFeatured) || tracks[0];
     setFeaturedTrack(featured);
-  }, [tracks]);
+  }, []); // Empty dependency array to run only once
 
   const handleTrackSelect = (track: FeaturedTrack) => {
     setFeaturedTrack(track);

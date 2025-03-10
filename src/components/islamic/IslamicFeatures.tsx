@@ -11,17 +11,7 @@ import { Book, Calendar, Clock, BookOpen } from "lucide-react";
 import AzkarSection from "./AzkarSection";
 import PrayerTimes from "./PrayerTimes";
 import HijriCalendar from "./HijriCalendar";
-
-// Create a placeholder component for QuranSection since it's not available
-const QuranPlaceholder = () => (
-  <Card className="h-full">
-    <CardContent className="flex items-center justify-center h-full">
-      <p className="text-muted-foreground">
-        Quran section is currently unavailable
-      </p>
-    </CardContent>
-  </Card>
-);
+import QuranSection from "./QuranSection";
 
 interface IslamicFeaturesProps {
   defaultTab?: string;
@@ -101,7 +91,7 @@ const IslamicFeatures: React.FC<IslamicFeaturesProps> = ({
               </TabsContent>
 
               <TabsContent value="quran" className="h-full mt-0">
-                <QuranPlaceholder />
+                <QuranSection />
               </TabsContent>
 
               <TabsContent value="prayer-times" className="h-full mt-0">
